@@ -104,7 +104,7 @@ async function run() {
         // iOS signing and provisioning
         //--------------------------------------------------------
         var signMethod : string = tl.getInput('signMethod', false);
-        var keychainToDelete : string;
+        var keychainToDelete : string[] = [];
         var profileToDelete : string;
         var automaticSigningWithXcode: boolean = tl.getBoolInput('xcode8AutomaticSigning');
         var xcode_otherCodeSignFlags: string;
@@ -127,7 +127,7 @@ async function run() {
                 await sign.installCertInTemporaryKeychain(keychain, keychainPwd, p12, p12pwd);
                 xcode_otherCodeSignFlags = 'OTHER_CODE_SIGN_FLAGS=--keychain=' + keychain;
                 xcb.arg(xcode_otherCodeSignFlags);
-                keychainToDelete = keychain;
+                keychainToDelete = keychainToDelete.concat(keychain);
 
                 //find signing identity
                 var signIdentity = await sign.findSigningIdentity(keychain);
@@ -244,10 +244,16 @@ async function run() {
             if(useXcrun) {
                 useXcrun = useXcrun.toString().toLowerCase();
             } else {
-                //useXcrun is not set, default to use xcrun
-                useXcrun = 'true';
+                //useXcrun variable is not set, check for input on the task
+                var packageTool: string = tl.getInput('packageTool');
+                if(packageTool && packageTool.toString().toLowerCase() === 'xcodebuild') {
+                    //user has specifically picked to use xcodebuild archive/export
+                    useXcrun = 'false';
+                } else  {
+                    useXcrun = 'true';
+                }
             }
-            if (useXcrun === 'true' || useXctool || !ws || !scheme) {
+            if (useXcrun === 'true' || useXctool || !ws || !tl.filePathSupplied('xcWorkspacePath') || !scheme) {
                 // xcrun has been deprecated in Xcode 7 and higher
                 // use xcrun to package apps if xcodeversion is < 7
                 // or if workspace or scheme are not specified since we cannot create the archive
@@ -313,6 +319,8 @@ async function run() {
                     var exportMethod: string;
                     var exportTeamId: string;
                     var exportOptionsPlist : string;
+                    var exportSigningCert: string;
+                    var exportSigningCertPassword: string;
 
                     if(exportOptions === 'auto') {
                         // Automatically try to detect the export-method to use from the provisioning profile
@@ -330,11 +338,27 @@ async function run() {
                     } else if(exportOptions === 'specify') {
                         exportMethod = tl.getInput('exportMethod', true);
                         exportTeamId = tl.getInput('exportTeamId');
+                        exportSigningCert = tl.getInput('exportSigningCert');
+                        exportSigningCertPassword = tl.getInput('exportSigningCertPassword');
                     } else if (exportOptions === 'plist') {
+                        exportSigningCert = tl.getInput('exportSigningCert');
+                        exportSigningCertPassword = tl.getInput('exportSigningCertPassword');
                         exportOptionsPlist = tl.getInput('exportOptionsPlist');
                         if(!tl.filePathSupplied('exportOptionsPlist') || !pathExistsAsFile(exportOptionsPlist)) {
                             throw tl.loc('ExportOptionsPlistInvalidFilePath', exportOptionsPlist);
                         }
+                    }
+
+                    var export_otherCodeSignFlags: string;
+                    if(exportSigningCert && tl.filePathSupplied('exportSigningCert') && tl.exist(exportSigningCert)) {
+                        var export_keychain : string = tl.resolve(workingDir, '_xcodetaskexporttmp.keychain');
+                        var export_keychainPwd : string = '_xcodetaskexport_TmpKeychain_Pwd#1';
+
+                        //create a temporary keychain and install the p12 into that keychain
+                        await sign.installCertInTemporaryKeychain(export_keychain, export_keychainPwd, exportSigningCert, exportSigningCertPassword);
+                        export_otherCodeSignFlags = 'OTHER_CODE_SIGN_FLAGS=--keychain=' + export_keychain;
+
+                        keychainToDelete = keychainToDelete.concat(export_keychain);
                     }
 
                     if(exportMethod) {
@@ -366,6 +390,7 @@ async function run() {
                         xcodeExport.arg(['-exportArchive', '-archivePath', archive]);
                         xcodeExport.arg(['-exportPath', exportPath]);
                         xcodeExport.argIf(exportOptionsPlist, ['-exportOptionsPlist', exportOptionsPlist]);
+                        xcodeExport.argIf(export_otherCodeSignFlags, export_otherCodeSignFlags);
 
                         if(useXcpretty) {
                             var xcPrettyTool:ToolRunner = tl.tool(tl.which('xcpretty', true));
@@ -384,12 +409,14 @@ async function run() {
         tl.setResult(tl.TaskResult.Failed, err);
     } finally {
         //clean up the temporary keychain, so it is not used to search for code signing identity in future builds
-        if(keychainToDelete) {
-            try {
-                await sign.deleteKeychain(keychainToDelete);
-            } catch(err) {
-                tl.debug('Failed to delete temporary keychain. Error = ' + err);
-                tl.warning(tl.loc('TempKeychainDeleteFailed', keychainToDelete));
+        if(keychainToDelete && keychainToDelete.length > 0) {
+            for(var i = 0; i < keychainToDelete.length; i ++) {
+                try {
+                    await sign.deleteKeychain(keychainToDelete[i]);
+                } catch (err) {
+                    tl.debug('Failed to delete temporary keychain. Error = ' + err);
+                    tl.warning(tl.loc('TempKeychainDeleteFailed', keychainToDelete[i]));
+                }
             }
         }
 

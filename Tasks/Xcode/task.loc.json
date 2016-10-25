@@ -12,7 +12,7 @@
   "version": {
     "Major": 2,
     "Minor": 3,
-    "Patch": 5
+    "Patch": 7
   },
   "demands": [
     "xcode"
@@ -88,13 +88,27 @@
       "helpMarkDown": "ms-resource:loc.input.help.packageApp"
     },
     {
+      "name": "packageTool",
+      "type": "pickList",
+      "label": "ms-resource:loc.input.label.packageTool",
+      "defaultValue": "xcrun",
+      "required": true,
+      "helpMarkDown": "ms-resource:loc.input.help.packageTool",
+      "options": {
+        "xcrun": "xcrun (deprecated by Apple)",
+        "xcodebuild": "xcodebuild archive and export"
+      },
+      "groupName": "package"
+    },
+    {
       "name": "archivePath",
       "type": "filePath",
       "label": "ms-resource:loc.input.label.archivePath",
       "defaultValue": "",
       "required": false,
       "helpMarkDown": "ms-resource:loc.input.help.archivePath",
-      "groupName": "package"
+      "groupName": "package",
+      "visibleRule": "packageTool == xcodebuild"
     },
     {
       "name": "exportPath",
@@ -103,7 +117,8 @@
       "defaultValue": "output/$(SDK)/$(Configuration)",
       "required": false,
       "helpMarkDown": "ms-resource:loc.input.help.exportPath",
-      "groupName": "package"
+      "groupName": "package",
+      "visibleRule": "packageTool == xcodebuild"
     },
     {
       "name": "exportOptions",
@@ -117,7 +132,8 @@
         "plist": "Plist",
         "specify": "Specify"
       },
-      "helpMarkDown": "ms-resource:loc.input.help.exportOptions"
+      "helpMarkDown": "ms-resource:loc.input.help.exportOptions",
+      "visibleRule": "packageTool == xcodebuild"
     },
     {
       "name": "exportMethod",
@@ -148,6 +164,26 @@
       "helpMarkDown": "ms-resource:loc.input.help.exportOptionsPlist",
       "groupName": "package",
       "visibleRule": "exportOptions == plist"
+    },
+    {
+      "name": "exportSigningCert",
+      "type": "filePath",
+      "label": "ms-resource:loc.input.label.exportSigningCert",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "ms-resource:loc.input.help.exportSigningCert",
+      "groupName": "package",
+      "visibleRule": "exportOptions != auto"
+    },
+    {
+      "name": "exportSigningCertPassword",
+      "type": "string",
+      "label": "ms-resource:loc.input.label.exportSigningCertPassword",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "ms-resource:loc.input.help.exportSigningCertPassword",
+      "groupName": "package",
+      "visibleRule": "exportOptions != auto"
     },
     {
       "name": "xcode8AutomaticSigning",
