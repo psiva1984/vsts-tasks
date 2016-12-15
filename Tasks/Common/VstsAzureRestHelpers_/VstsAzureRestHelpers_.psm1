@@ -42,7 +42,6 @@ function Get-ProxyUri
     
     $proxyUri = (Get-Item env:AGENT_PROXYURL).value
     Write-Verbose -Verbose ("Reading proxy from .proxy file. Proxy url specified={0}" -f $proxyUri)
-    $proxyCreds = [pscredential]$null
 
     if($proxyUri)
     {
