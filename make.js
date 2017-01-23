@@ -53,8 +53,8 @@ var buildPath = path.join(__dirname, '_build', 'Tasks');
 var buildTestsPath = path.join(__dirname, '_build', 'Tests');
 var commonPath = path.join(__dirname, '_build', 'Tasks', 'Common');
 var packagePath = path.join(__dirname, '_package');
-var testTasksPath = path.join(__dirname, '_test', 'Tasks');
-var testPath = path.join(__dirname, '_test', 'Tests');
+var legacyTestPath = path.join(__dirname, '_test', 'Tests');
+var legacyTestTasksPath = path.join(__dirname, '_test', 'Tasks');
 
 // node min version
 var minNodeVer = '4.0.0';
@@ -241,16 +241,16 @@ target.test = function() {
     ensureTool('tsc', '--version', 'Version 1.8.7');
     ensureTool('mocha', '--version', '2.3.3');
 
-    // build/copy the ps test infra
+    // build the general tests and ps test infra
     rm('-Rf', buildTestsPath);
-    mkdir('-p', path.join(buildTestsPath, 'lib'));
-    var runnerSource = path.join(__dirname, 'Tests', 'lib', 'psRunner.ts');
-    run(`tsc ${runnerSource} --outDir ${path.join(buildTestsPath, 'lib')}`);
+    mkdir('-p', path.join(buildTestsPath));
+    run(`tsc ${path.join(__dirname, 'Tests')} --outDir ${buildTestsPath}`);
     console.log();
     console.log('> copying ps test lib resources');
-    matchCopy('+(*.ps1|*.psm1)', path.join(__dirname, 'Tests', 'lib'), path.join(buildTestsPath, 'lib'));
+    mkdir('-p', path.join(buildTestsPath, 'lib'));
+    matchCopy(path.join('**', '@(*.ps1|*.psm1)'), path.join(__dirname, 'Tests', 'lib'), path.join(buildTestsPath, 'lib'));
 
-    // run the tests
+    // find the task-specific tests
     var suiteType = options.suite || 'L0';
     var taskType = options.task || '*';
     var pattern1 = buildPath + '/' + taskType + '/Tests/' + suiteType + '.js';
@@ -261,7 +261,14 @@ target.test = function() {
         fail(`Unable to find tests using the following patterns: ${JSON.stringify([pattern1, pattern2])}`);
     }
 
-    run('mocha ' + testsSpec.join(' '), /*inheritStreams:*/true);
+    // find the general tests
+    var generalPattern = buildTestsPath + '/' + suiteType + '.js';
+    var generalTestsSpec = matchFind(generalPattern);
+    if (!generalTestsSpec.length) {
+        fail(`Unable to find tests using the following pattern: ${generalPattern}`);
+    }
+
+    run('mocha ' + testsSpec.concat(generalTestsSpec).join(' '), /*inheritStreams:*/true);
 }
 
 //
@@ -283,30 +290,30 @@ target.testLegacy = function() {
     mkdir('-p', testTasksPath);
     cp('-R', path.join(buildPath, '*'), testTasksPath);
 
-    // compile L0 and lib
-    var testSource = path.join(__dirname, 'Tests');
+    // compile legacy L0 and lib
+    var testSource = path.join(__dirname, 'Tests-Legacy');
     cd(testSource);
-    run('tsc --outDir ' + testPath + ' --rootDir ' + testSource);
+    run('tsc --outDir ' + legacyTestPath + ' --rootDir ' + testSource);
 
     // copy L0 test resources
     console.log();
     console.log('> copying L0 resources');
-    matchCopy('+(data|*.ps1|*.json)', path.join(__dirname, 'Tests', 'L0'), path.join(testPath, 'L0'), { dot: true });
+    matchCopy(path.join('**', '@(data|*.ps1|*.json)'), path.join(__dirname, 'Tests-Legacy', 'L0'), path.join(legacyTestPath, 'L0'), { dot: true });
 
     // copy test lib resources (contains ps scripts, etc)
     console.log();
     console.log('> copying lib resources');
-    matchCopy('+(*.ps1|*.psm1|package.json)', path.join(__dirname, 'Tests', 'lib'), path.join(testPath, 'lib'));
+    matchCopy(path.join('**', '@(*.ps1|*.psm1|package.json)'), path.join(__dirname, 'Tests-Legacy', 'lib'), path.join(legacyTestPath, 'lib'));
 
     // create a test temp dir - used by the task runner to copy each task to an isolated dir
-    var tempDir = path.join(testPath, 'Temp');
+    var tempDir = path.join(legacyTestPath, 'Temp');
     process.env['TASK_TEST_TEMP'] = tempDir;
     mkdir('-p', tempDir);
 
     // suite path
-    var suitePath = path.join(testPath, options.suite || 'L0/**', '_suite.js');
+    var suitePath = path.join(legacyTestPath, options.suite || 'L0/**', '_suite.js');
     suitePath = path.normalize(suitePath);
-    var testsSpec = matchFind(suitePath, path.join(testPath, 'L0'));
+    var testsSpec = matchFind(suitePath, path.join(legacyTestPath, 'L0'));
     if (!testsSpec.length) {
         fail(`Unable to find tests using the following pattern: ${suitePath}`);
     }
@@ -318,7 +325,7 @@ target.testLegacy = function() {
     // of the runnable context is analyzed to determine whether any tests failed.
     // if any tests failed, log a ##vso command to fail the build.
     var testsSpecPath = ''
-    var testsSpecPath = path.join(testPath, 'testsSpec.js');
+    var testsSpecPath = path.join(legacyTestPath, 'testsSpec.js');
     var contents = 'var __suite_to_run;' + os.EOL;
     contents += 'describe(\'Legacy L0\', function (__outer_done) {' + os.EOL;
     contents += '    after(function (done) {' + os.EOL;

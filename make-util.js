@@ -131,6 +131,13 @@ var buildNodeTask = function (taskPath, outDir) {
     if (test('-f', rp('package.json'))) {
         run('npm install');
     }
+
+    if (test('-f', rp(path.join('Tests', 'package.json')))) {
+        cd(rp('Tests'));
+        run('npm install');
+        cd(taskPath);
+    }
+
     run('tsc --outDir ' + outDir + ' --rootDir ' + taskPath);
     cd(originalDir);
 }
