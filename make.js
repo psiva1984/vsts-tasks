@@ -287,6 +287,45 @@ target.testLegacy = function() {
     // copy the tasks to the test dir
     console.log();
     console.log('> copying tasks');
+    taskList.forEach(function (taskName) {
+        if (test('-e', path.join(__dirname, 'Tests-Legacy', 'L0', taskName))) {
+            // copy the built task
+            var taskCopySource = path.join(buildPath, taskName);
+            var taskCopyDest = path.join(testTasksPath, taskName);
+            mkdir('-p', taskDest);
+            cp('-R', taskSource, taskDest);
+        }
+
+        // copy the 
+        var taskMakePath = path.join(__dirname, taskName, 'make.json');
+        var taskMake = test('-f', taskMakePath) ? require(taskMakePath) : {};
+        if (taskMake.hasOwnProperty('externals')) {
+            console.log('Getting task externals');
+            getExternals(taskMake.externals, outDir);
+        }
+
+        //--------------------------------
+        // Common: build, copy, install 
+        //--------------------------------
+        if (taskMake.hasOwnProperty('common')) {
+            var common = taskMake['common'];
+
+            common.forEach(function(mod) {
+                var modPath = path.join(taskPath, mod['module']);
+                var modName = path.basename(modPath);
+                var modOutDir = path.join(commonPath, modName);
+
+                if (!test('-d', modOutDir)) {
+                    banner('Building module ' + modPath, true);
+
+                    mkdir('-p', modOutDir);
+        var taskMakePath = path.join(__dirname, 'Tasks')
+        if (test('-f', 'make.json')) {
+            path.join
+        }
+    });
+    console.log();
+    console.log('> copying tasks');
     mkdir('-p', testTasksPath);
     cp('-R', path.join(buildPath, '*'), testTasksPath);
 
