@@ -178,16 +178,16 @@ var matchFind = function (pattern, root, options) {
     assert(pattern, 'pattern');
     assert(root, 'root');
 
+    // create a copy of the options
+    var clone = {};
+    Object.keys(options || {}).forEach(function (key) {
+        clone[key] = options[key];
+    });
+    options = clone;
+
     // determine whether to recurse
-    options = options || {};
     var noRecurse = options.hasOwnProperty('noRecurse') && options.noRecurse;
     delete options.noRecurse;
-
-    // merge specified options with defaults
-    mergedOptions = { matchBase: true };
-    Object.keys(options || {}).forEach(function (key) {
-        mergedOptions[key] = options[key];
-    });
 
     // normalize first, so we can substring later
     root = path.resolve(root);
@@ -207,7 +207,7 @@ var matchFind = function (pattern, root, options) {
             });
     }
 
-    return minimatch.match(items, pattern, mergedOptions);
+    return minimatch.match(items, pattern, options);
 }
 exports.matchFind = matchFind;
 
