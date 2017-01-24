@@ -40,7 +40,6 @@ var addPath = util.addPath;
 var copyTaskResources = util.copyTaskResources;
 var matchFind = util.matchFind;
 var matchCopy = util.matchCopy;
-var matchRemove = util.matchRemove;
 var ensureTool = util.ensureTool;
 var assert = util.assert;
 var getExternals = util.getExternals;
@@ -73,7 +72,7 @@ addPath(binPath);
 var taskList;
 if (options.task) {
     // find using --task parameter
-    taskList = matchFind(options.task, path.join(__dirname, 'Tasks'), { noRecurse: true })
+    taskList = matchFind(options.task, path.join(__dirname, 'Tasks'), { noRecurse: true, matchBase: true })
         .map(function (item) {
             return path.basename(item);
         });
@@ -207,7 +206,7 @@ target.build = function() {
                         dest = path.join(outDir, 'ps_modules', modName);
                     }
 
-                    matchCopy('!Tests', modOutDir, dest, { noRecurse: true });
+                    matchCopy('!(Tests)', modOutDir, dest, { noRecurse: true, matchBase: true });
                 }
             });
         }
@@ -244,7 +243,8 @@ target.test = function() {
     // build the general tests and ps test infra
     rm('-Rf', buildTestsPath);
     mkdir('-p', path.join(buildTestsPath));
-    run(`tsc ${path.join(__dirname, 'Tests')} --outDir ${buildTestsPath}`);
+    cd(path.join(__dirname, 'Tests'));
+    run(`tsc --rootDir ${path.join(__dirname, 'Tests')} --outDir ${buildTestsPath}`);
     console.log();
     console.log('> copying ps test lib resources');
     mkdir('-p', path.join(buildTestsPath, 'lib'));
@@ -257,13 +257,13 @@ target.test = function() {
     var pattern2 = buildPath + '/Common/' + taskType + '/Tests/' + suiteType + '.js';
     var testsSpec = matchFind(pattern1, buildPath)
         .concat(matchFind(pattern2, buildPath));
-    if (!testsSpec.length) {
+    if (!testsSpec.length && !process.env.TF_BUILD) {
         fail(`Unable to find tests using the following patterns: ${JSON.stringify([pattern1, pattern2])}`);
     }
 
     // find the general tests
     var generalPattern = buildTestsPath + '/' + suiteType + '.js';
-    var generalTestsSpec = matchFind(generalPattern);
+    var generalTestsSpec = matchFind(generalPattern, buildTestsPath, { noRecurse: true });
     if (!generalTestsSpec.length) {
         fail(`Unable to find tests using the following pattern: ${generalPattern}`);
     }
@@ -297,12 +297,12 @@ target.testLegacy = function() {
             // copy the L0 source files
             console.log('copying ' + taskName);
             var testCopyDest = path.join(legacyTestPath, 'L0', taskName);
-            matchCopy('*', testCopySource, testCopyDest, { noRecurse: true });
+            matchCopy('*', testCopySource, testCopyDest, { noRecurse: true, matchBase: true });
 
             // copy the task layout
             var taskCopySource = path.join(buildPath, taskName);
             var taskCopyDest = path.join(legacyTestTasksPath, taskName);
-            matchCopy('*', taskCopySource, taskCopyDest, { noRecurse: true });
+            matchCopy('*', taskCopySource, taskCopyDest, { noRecurse: true, matchBase: true });
 
             // copy the L0 source files for each common-module; copy the layout for each common module
             var taskPath = path.join(__dirname, taskName);
@@ -317,12 +317,12 @@ target.testLegacy = function() {
                     var modTestCopyDest = path.join(legacyTestPath, 'L0', taskName);
                     if (test('-e', modTestCopySource) && !test('-e', modTestCopyDest)) {
                         // copy the common module L0 source files
-                        matchCopy('*', modTestCopySource, modTestCopyDest, { noRecurse: true });
+                        matchCopy('*', modTestCopySource, modTestCopyDest, { noRecurse: true, matchBase: true });
 
                         // copy the common module layout
                         var modCopySource = path.join(commonPath, modName);
                         var modCopyDest = path.join(legacyTestTasksPath, 'Common', modName);
-                        matchCopy('*', modCopySource, modCopyDest, { noRecurse: true });
+                        matchCopy('*', modCopySource, modCopyDest, { noRecurse: true, matchBase: true });
                     }
                 });
             }
@@ -338,11 +338,11 @@ target.testLegacy = function() {
     // copy the legacy test infra
     console.log();
     console.log('> copying legacy test infra');
-    matchCopy('@(definitions|lib|tsconfig.json)', path.join(__dirname, 'Tests-Legacy'), legacyTestPath, { noRecurse: true });
+    matchCopy('@(definitions|lib|tsconfig.json)', path.join(__dirname, 'Tests-Legacy'), legacyTestPath, { noRecurse: true, matchBase: true });
 
     // copy the lib tests when running all legacy tests
     if (!options.task) {
-        matchCopy('*', path.join(__dirname, 'Tests-Legacy', 'L0', 'lib'), path.join(legacyTestPath, 'L0', 'lib'), { noRecurse: true });
+        matchCopy('*', path.join(__dirname, 'Tests-Legacy', 'L0', 'lib'), path.join(legacyTestPath, 'L0', 'lib'), { noRecurse: true, matchBase: true });
     }
 
     // compile legacy L0 and lib

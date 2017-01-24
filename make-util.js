@@ -147,7 +147,7 @@ var buildPs3Task = function (taskPath, outDir) {
     var packageUrl = 'https://www.powershellgallery.com/api/v2/package/VstsTaskSdk/0.7.1';
     var packageSource = downloadArchive(packageUrl, /*omitExtensionCheck*/true);
     var packageDest = path.join(outDir, 'ps_modules/VstsTaskSdk');
-    matchCopy('+(*.ps1|*.psd1|*.psm1|lib.json|Strings)', packageSource, packageDest, { noRecurse: true });
+    matchCopy('+(*.ps1|*.psd1|*.psm1|lib.json|Strings)', packageSource, packageDest, { noRecurse: true, matchBase: true });
 }
 exports.buildPs3Task = buildPs3Task;
 
@@ -159,7 +159,7 @@ var copyTaskResources = function (taskMake, srcPath, destPath) {
     // copy the globally defined set of default task resources
     var toCopy = makeOptions['taskResources'];
     toCopy.forEach(function (item) {
-        matchCopy(item, srcPath, destPath, { noRecurse: true });
+        matchCopy(item, srcPath, destPath, { noRecurse: true, matchBase: true });
     });
 
     // copy the locally defined set of resources
@@ -234,19 +234,6 @@ var matchCopy = function (pattern, sourceRoot, destRoot, options) {
         });
 }
 exports.matchCopy = matchCopy;
-
-var matchRemove = function (pattern, sourceRoot, options) {
-    assert(pattern, 'pattern');
-    assert(sourceRoot, 'sourceRoot');
-
-    console.log(`removing ${pattern}`);
-
-    matchFind(pattern, sourceRoot, options)
-        .forEach(function (item) {
-            rm('-Rf', item);
-        });
-}
-exports.matchRemove = matchRemove;
 
 var run = function (cl, inheritStreams, noHeader) {
     if (!noHeader) {
