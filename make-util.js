@@ -893,11 +893,11 @@ var createHotfixLayout = function (packagePath, taskName) {
     console.log(`> Creating hotfix layout for task '${taskName}'`);
 
     // create the script
-    var hotfixPath = path.join(package, 'hotfix');
+    var hotfixPath = path.join(packagePath, 'hotfix');
     mkdir('-p', hotfixPath);
     var scriptPath = path.join(hotfixPath, `${taskName}.ps1`);
     var scriptContent = '$ErrorActionPreference=\'Stop\'' + os.EOL;
-    scriptContent += 'Update-DistributedTaskDefinitions -TaskZip $PSScriptRoot\task.zip' + os.EOL;
+    scriptContent += 'Update-DistributedTaskDefinitions -TaskZip $PSScriptRoot\\task.zip' + os.EOL;
     fs.writeFileSync(scriptPath, scriptContent);
 
     // link the non-aggregated tasks zip
