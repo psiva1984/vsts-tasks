@@ -53,7 +53,7 @@ var buildPath = path.join(__dirname, '_build', 'Tasks');
 var buildTestsPath = path.join(__dirname, '_build', 'Tests');
 var commonPath = path.join(__dirname, '_build', 'Tasks', 'Common');
 var packagePath = path.join(__dirname, '_package');
-var legacyTestPath = path.join(__dirname, '_test', 'Tests');
+var legacyTestPath = path.join(__dirname, '_test', 'Tests-Legacy');
 var legacyTestTasksPath = path.join(__dirname, '_test', 'Tasks');
 
 // node min version
@@ -280,69 +280,75 @@ target.testLegacy = function() {
     ensureTool('tsc', '--version', 'Version 1.8.7');
     ensureTool('mocha', '--version', '2.3.3');
 
+    if (options.suite) {
+        fail('The "suite" parameter has been deprecated. Use the "task" parameter instead.');
+    }
+
     // clean
     console.log('removing _test');
     rm('-Rf', path.join(__dirname, '_test'));
 
-    // copy the tasks to the test dir
+    // copy the built tasks; copy the test source code
     console.log();
     console.log('> copying tasks');
     taskList.forEach(function (taskName) {
-        if (test('-e', path.join(__dirname, 'Tests-Legacy', 'L0', taskName))) {
+        var testCopySource = path.join(__dirname, 'Tests-Legacy', 'L0', taskName);
+        if (test('-e', testCopySource)) {
+            // copy the test source code
+            console.log('copying ' + taskName);
+            var testCopyDest = path.join(legacyTestPath, 'L0', taskName);
+            matchCopy('*', testCopySource, testCopyDest, { noRecurse: true });
+
             // copy the built task
             var taskCopySource = path.join(buildPath, taskName);
             var taskCopyDest = path.join(testTasksPath, taskName);
-            mkdir('-p', taskDest);
-            cp('-R', taskSource, taskDest);
-        }
+            matchCopy('*', taskCopySource, taskCopyDest, { noRecurse: true });
 
-        // copy the 
-        var taskMakePath = path.join(__dirname, taskName, 'make.json');
-        var taskMake = test('-f', taskMakePath) ? require(taskMakePath) : {};
-        if (taskMake.hasOwnProperty('externals')) {
-            console.log('Getting task externals');
-            getExternals(taskMake.externals, outDir);
-        }
+            // copy each related common-module's test source code
+            var taskPath = path.join(__dirname, taskName);
+            var taskMakePath = path.join(__dirname, taskName, 'make.json');
+            var taskMake = test('-f', taskMakePath) ? JSON.parse(fs.readFileSync(taskMakePath).toString()) : {};
+            if (taskMake.hasOwnProperty('common')) {
+                var common = taskMake['common'];
+                common.forEach(function(mod) {
+                    var modName = path.basename(mod['module']);
+                    console.log('copying ' + modName);
+                    var modTestCopySource = path.join(__dirname, 'Tests-Legacy', 'L0', `Common-${modName}`);
+                    var modTestCopyDest = path.join(legacyTestPath, 'L0', taskName);
+                    if (test('-e', modTestCopySource) && !test('-e', modTestCopyDest)) {
+                        // copy the common-module test source code
+                        matchCopy('*', modTestCopySource, modTestCopyDest, { noRecurse: true });
 
-        //--------------------------------
-        // Common: build, copy, install 
-        //--------------------------------
-        if (taskMake.hasOwnProperty('common')) {
-            var common = taskMake['common'];
-
-            common.forEach(function(mod) {
-                var modPath = path.join(taskPath, mod['module']);
-                var modName = path.basename(modPath);
-                var modOutDir = path.join(commonPath, modName);
-
-                if (!test('-d', modOutDir)) {
-                    banner('Building module ' + modPath, true);
-
-                    mkdir('-p', modOutDir);
-        var taskMakePath = path.join(__dirname, 'Tasks')
-        if (test('-f', 'make.json')) {
-            path.join
+                        // copy the built common-module
+                        var modCopySource = path.join(commonPath, modName);
+                        var modCopyDest = path.join(testTasksPath, 'Common', modName);
+                        matchCopy('*', modCopySource, modCopyDest, { noRecurse: true });
+                    }
+                });
+            }
         }
     });
+
+    // short-circuit if no tests
+    if (!test('-e', legacyTestPath)) {
+        banner('no legacy tests found', true);
+        return;
+    }
+
+    // copy the legacy test infra
     console.log();
-    console.log('> copying tasks');
-    mkdir('-p', testTasksPath);
-    cp('-R', path.join(buildPath, '*'), testTasksPath);
+    console.log('> copying legacy test infra');
+    matchCopy('@(lib|tsconfig.json)', path.join(__dirname, 'Tests-Legacy'), legacyTestPath, { noRecurse: true });
+
+    // copy the lib tests when running all legacy tests
+    if (!options.task) {
+        matchCopy('*', path.join(__dirname, 'Tests-Legacy', 'L0', 'lib'), path.join(legacyTestPath, 'L0', 'lib'), { noRecurse: true });
+    }
 
     // compile legacy L0 and lib
     var testSource = path.join(__dirname, 'Tests-Legacy');
-    cd(testSource);
-    run('tsc --outDir ' + legacyTestPath + ' --rootDir ' + testSource);
-
-    // copy L0 test resources
-    console.log();
-    console.log('> copying L0 resources');
-    matchCopy(path.join('**', '@(data|*.ps1|*.json)'), path.join(__dirname, 'Tests-Legacy', 'L0'), path.join(legacyTestPath, 'L0'), { dot: true });
-
-    // copy test lib resources (contains ps scripts, etc)
-    console.log();
-    console.log('> copying lib resources');
-    matchCopy(path.join('**', '@(*.ps1|*.psm1|package.json)'), path.join(__dirname, 'Tests-Legacy', 'lib'), path.join(legacyTestPath, 'lib'));
+    cd(legacyTestPath);
+    run('tsc --rootDir ' + legacyTestPath);
 
     // create a test temp dir - used by the task runner to copy each task to an isolated dir
     var tempDir = path.join(legacyTestPath, 'Temp');
@@ -350,11 +356,9 @@ target.testLegacy = function() {
     mkdir('-p', tempDir);
 
     // suite path
-    var suitePath = path.join(legacyTestPath, options.suite || 'L0/**', '_suite.js');
-    suitePath = path.normalize(suitePath);
-    var testsSpec = matchFind(suitePath, path.join(legacyTestPath, 'L0'));
+    var testsSpec = matchFind(path.join('**', '_suite.js'), path.join(legacyTestPath, 'L0'));
     if (!testsSpec.length) {
-        fail(`Unable to find tests using the following pattern: ${suitePath}`);
+        fail(`Unable to find tests using the pattern: ${path.join('**', '_suite.js')}`);
     }
 
     // mocha doesn't always return a non-zero exit code on test failure. when only
