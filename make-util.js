@@ -899,6 +899,27 @@ var createNonAggregatedZip = function (buildPath, packagePath) {
 }
 exports.createNonAggregatedZip = createNonAggregatedZip;
 
+var createHotfixLayout = function (packagePath, taskName) {
+    assert(packagePath, 'packagePath');
+    assert(taskName, 'taskName');
+    console.log();
+    console.log(`> Creating hotfix layout for task '${taskName}'`);
+
+    // create the script
+    var hotfixPath = path.join(package, 'hotfix');
+    mkdir('-p', hotfixPath);
+    var scriptPath = path.join(hotfixPath, `${taskName}.ps1`);
+    var scriptContent = '$ErrorActionPreference=\'Stop\'' + os.EOL;
+    scriptContent += 'Update-DistributedTaskDefinitions -TaskZip $PSScriptRoot\task.zip' + os.EOL;
+    fs.writeFileSync(scriptPath, scriptContent);
+
+    // link the non-aggregated tasks zip
+    var zipSourcePath = path.join(packagePath, 'non-aggregated-tasks.zip');
+    var zipDestPath = path.join(hotfixPath, 'tasks.zip');
+    fs.linkSync(zipSourcePath, zipDestPath);
+}
+exports.createHotfixLayout = createHotfixLayout;
+
 var createAggregatedZip = function (packagePath) {
     assert(packagePath, 'packagePath');
 

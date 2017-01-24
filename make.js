@@ -288,23 +288,23 @@ target.testLegacy = function() {
     console.log('removing _test');
     rm('-Rf', path.join(__dirname, '_test'));
 
-    // copy the built tasks; copy the test source code
+    // copy the L0 source files for each task; copy the layout for each task
     console.log();
     console.log('> copying tasks');
     taskList.forEach(function (taskName) {
         var testCopySource = path.join(__dirname, 'Tests-Legacy', 'L0', taskName);
         if (test('-e', testCopySource)) {
-            // copy the test source code
+            // copy the L0 source files
             console.log('copying ' + taskName);
             var testCopyDest = path.join(legacyTestPath, 'L0', taskName);
             matchCopy('*', testCopySource, testCopyDest, { noRecurse: true });
 
-            // copy the built task
+            // copy the task layout
             var taskCopySource = path.join(buildPath, taskName);
             var taskCopyDest = path.join(legacyTestTasksPath, taskName);
             matchCopy('*', taskCopySource, taskCopyDest, { noRecurse: true });
 
-            // copy each related common-module's test source code
+            // copy the L0 source files for each common-module; copy the layout for each common module
             var taskPath = path.join(__dirname, taskName);
             var taskMakePath = path.join(__dirname, taskName, 'make.json');
             var taskMake = test('-f', taskMakePath) ? JSON.parse(fs.readFileSync(taskMakePath).toString()) : {};
@@ -316,10 +316,10 @@ target.testLegacy = function() {
                     var modTestCopySource = path.join(__dirname, 'Tests-Legacy', 'L0', `Common-${modName}`);
                     var modTestCopyDest = path.join(legacyTestPath, 'L0', taskName);
                     if (test('-e', modTestCopySource) && !test('-e', modTestCopyDest)) {
-                        // copy the common-module test source code
+                        // copy the common module L0 source files
                         matchCopy('*', modTestCopySource, modTestCopyDest, { noRecurse: true });
 
-                        // copy the built common-module
+                        // copy the common module layout
                         var modCopySource = path.join(commonPath, modName);
                         var modCopyDest = path.join(legacyTestTasksPath, 'Common', modName);
                         matchCopy('*', modCopySource, modCopyDest, { noRecurse: true });
@@ -355,7 +355,7 @@ target.testLegacy = function() {
     process.env['TASK_TEST_TEMP'] = tempDir;
     mkdir('-p', tempDir);
 
-    // suite path
+    // suite paths
     var testsSpec = matchFind(path.join('**', '_suite.js'), path.join(legacyTestPath, 'L0'));
     if (!testsSpec.length) {
         fail(`Unable to find tests using the pattern: ${path.join('**', '_suite.js')}`);
@@ -402,6 +402,12 @@ target.package = function() {
     // create the non-aggregated layout
     util.createNonAggregatedZip(buildPath, packagePath);
 
+    // if task specified, create hotfix layout and short-circuit
+    if (options.task) {
+        util.createHotfixLayout(packagePath, options.task);
+        return;
+    }
+
     // create the aggregated tasks layout
     util.createAggregatedZip(packagePath);
 
@@ -445,6 +451,12 @@ target.package = function() {
 target.publish = function() {
     var server = options.server;
     assert(server, 'server');
+
+    // if task specified, skip
+    if (options.task) {
+        banner('Task parameter specified. Skipping publish.');
+        return;
+    }
 
     // get the branch/commit info
     var refs = util.getRefs();
