@@ -301,7 +301,7 @@ target.testLegacy = function() {
 
             // copy the built task
             var taskCopySource = path.join(buildPath, taskName);
-            var taskCopyDest = path.join(testTasksPath, taskName);
+            var taskCopyDest = path.join(legacyTestTasksPath, taskName);
             matchCopy('*', taskCopySource, taskCopyDest, { noRecurse: true });
 
             // copy each related common-module's test source code
@@ -321,7 +321,7 @@ target.testLegacy = function() {
 
                         // copy the built common-module
                         var modCopySource = path.join(commonPath, modName);
-                        var modCopyDest = path.join(testTasksPath, 'Common', modName);
+                        var modCopyDest = path.join(legacyTestTasksPath, 'Common', modName);
                         matchCopy('*', modCopySource, modCopyDest, { noRecurse: true });
                     }
                 });
@@ -338,7 +338,7 @@ target.testLegacy = function() {
     // copy the legacy test infra
     console.log();
     console.log('> copying legacy test infra');
-    matchCopy('@(lib|tsconfig.json)', path.join(__dirname, 'Tests-Legacy'), legacyTestPath, { noRecurse: true });
+    matchCopy('@(definitions|lib|tsconfig.json)', path.join(__dirname, 'Tests-Legacy'), legacyTestPath, { noRecurse: true });
 
     // copy the lib tests when running all legacy tests
     if (!options.task) {

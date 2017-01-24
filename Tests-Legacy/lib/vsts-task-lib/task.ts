@@ -1,4 +1,4 @@
-/// <reference path="../../../definitions/node.d.ts" />
+/// <reference path="../../definitions/node.d.ts" />
 
 import Q = require('q');
 import path = require('path');
